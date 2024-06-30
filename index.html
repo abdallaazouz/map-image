@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>صورة من خرائط جوجل</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #ddd;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAskFlnokVUATk_OKC5XEWu416JlbIGRjE"></script>
+	
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+
+</head>
+<body>
+    <div class="container">
+        <input type="text" id="latitude" placeholder="أدخل خط العرض">
+        <input type="text" id="longitude" placeholder="أدخل خط الطول">
+        <input type="text" id="area" placeholder="أدخل المساحة بالمتر">
+        <button onclick="showMap()">عرض الموقع بالخريطة</button>
+        <div id="map"></div>
+        <button onclick="downloadMapData()">حفظ بيانات الخريطة</button>
+		<button onclick="saveMapAsImage()">حفظ صورة الخريطة</button>
+
+    </div>
+
+    <script>
+        let map;
+        let bounds;
+        let mapData = '';
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 15,
+                center: { lat: -34.397, lng: 150.644 },
+                mapTypeId: 'satellite'
+            });
+        }
+
+        function showMap() {
+            const latitude = parseFloat(document.getElementById('latitude').value);
+            const longitude = parseFloat(document.getElementById('longitude').value);
+            const area = parseFloat(document.getElementById('area').value);
+
+            if (!latitude || !longitude || !area) {
+                alert("يرجى إدخال جميع القيم.");
+                return;
+            }
+
+            bounds = {
+                north: latitude + area / 111320,
+                south: latitude - area / 111320,
+                east: longitude + area / (111320 * Math.cos(latitude * Math.PI / 180)),
+                west: longitude - area / (111320 * Math.cos(latitude * Math.PI / 180))
+            };
+
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 15,
+                center: { lat: latitude, lng: longitude },
+                mapTypeId: 'satellite'
+            });
+
+            map.fitBounds(bounds);
+
+            // تأخير بسيط لضمان تحميل الخريطة بالكامل
+            setTimeout(() => {
+			 const mapElement = document.getElementById('map');
+                html2canvas(mapElement, { useCORS: true, logging: true }).then(canvas => {
+				
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+                    const latitudes = [];
+                    const longitudes = [];
+                    const colors = [];
+                    const step = 10; // تغيير القيمة لضبط دقة النقاط
+
+                    for (let y = 0; y < canvas.height; y += step) {
+                        for (let x = 0; x < canvas.width; x += step) {
+                            const i = (y * canvas.width + x) * 4;
+                            const lat = bounds.south + (bounds.north - bounds.south) * (y / canvas.height);
+                            const lng = bounds.west + (bounds.east - bounds.west) * (x / canvas.width);
+
+                            const r = imageData[i];
+                            const g = imageData[i + 1];
+                            const b = imageData[i + 2];
+const c = (r + g + b )/10;
+                            if (r !== 0 && g !== 0 && b !== 0) {
+                            
+                                longitudes.push(lng.toFixed(6));
+								 latitudes.push(lat.toFixed(6));
+                                colors.push(`${c}`);
+                            }
+                        }
+                    }
+
+                    mapData = "خط العرض,خط الطول,اللون\n";
+                    for (let i = 0; i < latitudes.length; i++) {
+                        mapData += `${latitudes[i]},${longitudes[i]},${colors[i]}\n`;
+                    }
+                });
+            }, 2000); // تأخير لضمان تحميل الخريطة بالكامل بنظام satellite
+        }
+
+        function downloadMapData() {
+            if (!mapData) {
+                alert("يرجى عرض الخريطة أولاً.");
+                return;
+            }
+
+            const blob = new Blob([mapData], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'mapData.txt';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+       
+function saveMapAsImage() {
+    const mapElement = document.getElementById('map');
+
+    html2canvas(mapElement, { useCORS: true, logging: true }).then(canvas => {
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = 'map.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }).catch(error => {
+        console.error('خطأ في التقاط صورة الخريطة:', error);
+    });
+}
+
+ window.onload = initMap;
+
+    </script>
+</body>
+</html>
